@@ -234,14 +234,30 @@ function App() {
   }, [currentIndex, currentItem, mediaItems.length, presentationMode]);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!presentationMode || !video || currentItem?.type !== "video") return;
+  const video = videoRef.current;
 
-    video.muted = !soundEnabled;
-    void video.play().catch((error: unknown) => {
-      console.warn("Browser blocked automatic video playback.", error);
-    });
-  }, [currentIndex, currentItem, presentationMode, soundEnabled]);
+  if (!presentationMode || !video || currentItem?.type !== "video") {
+    return;
+  }
+console.log("PLAYING VIDEO", currentItem.name);
+  video.muted = !soundEnabled;
+
+setTimeout(() => {
+  video.load();
+
+  video.play().catch((error: unknown) => {
+    console.warn(
+      "Browser blocked automatic video playback.",
+      error
+    );
+  });
+}, 300);
+}, [
+  currentIndex,
+  currentItem,
+  presentationMode,
+  soundEnabled,
+]);
 
   return (
     <div className={presentationMode ? "app presentationApp" : "app"}>
@@ -321,16 +337,17 @@ function App() {
               alt={currentItem.name}
             />
           ) : (
-            <video
-              ref={videoRef}
-              className="presentationMedia"
-              src={currentItem.url}
-              autoPlay
-              muted={!soundEnabled}
-              playsInline
-              preload="auto"
-              controls={false}
-              onEnded={nextSlide}
+           <video
+  key={currentItem.id}
+  ref={videoRef}
+  className="presentationMedia"
+  src={currentItem.url}
+  autoPlay
+  muted={!soundEnabled}
+  playsInline
+  preload="auto"
+  controls={false}
+  onEnded={nextSlide}
             />
           )}
 
