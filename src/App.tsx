@@ -190,7 +190,7 @@ function App() {
 
   const startPresentation = (): void => {
     if (mediaItems.length === 0) return;
-    setSoundEnabled(true);
+    setSoundEnabled(false);
     setPresentationMode(true);
     document.body.style.overflow = "hidden";
   };
@@ -354,25 +354,28 @@ function App() {
 
           <div className="presentationControls">
             <button
-              type="button"
-              onClick={() => {
-  const newValue = !soundEnabled;
+  type="button"
+  onClick={() => {
+    const newValue = !soundEnabled;
 
-  setSoundEnabled(newValue);
+    setSoundEnabled(newValue);
 
-  if (videoRef.current) {
-    videoRef.current.muted = !newValue;
+    if (videoRef.current) {
+      videoRef.current.muted = !newValue;
+      videoRef.current.currentTime = videoRef.current.currentTime;
 
-    videoRef.current
-      .play()
-      .catch((error) =>
-        console.warn("Playback retry failed", error)
-      );
-  }
-}}
-            >
-              {soundEnabled ? "Mute" : "Enable Sound"}
-            </button>
+      if (newValue) {
+        videoRef.current.volume = 1;
+      }
+
+      videoRef.current.play().catch((error) => {
+        console.warn("Playback retry failed", error);
+      });
+    }
+  }}
+>
+  {soundEnabled ? "Mute" : "Enable Sound"}
+</button>
 
             <span>
               {currentIndex + 1} / {mediaItems.length}
