@@ -192,6 +192,7 @@ function App() {
   if (mediaItems.length === 0) return;
 
   setPresentationMode(true);
+  setSoundEnabled(true);
 
   const video = videoRef.current;
 
