@@ -224,7 +224,7 @@ function App() {
 
     imageTimerRef.current = window.setTimeout(() => {
       setCurrentIndex((index) => (index + 1) % mediaItems.length);
-    }, 10000);
+    }, 2000);
 
     return () => {
       if (imageTimerRef.current !== undefined) {
