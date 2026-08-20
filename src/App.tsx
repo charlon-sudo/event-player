@@ -189,12 +189,16 @@ function App() {
   };
 
   const startPresentation = (): void => {
-    if (mediaItems.length === 0) return;
-    setSoundEnabled(false);
-    setPresentationMode(true);
-    document.body.style.overflow = "hidden";
-  };
+  if (mediaItems.length === 0) return;
 
+  setPresentationMode(true);
+
+  const video = videoRef.current;
+
+  if (video) {
+    video.play().catch(() => {});
+  }
+};
   const exitPresentation = async (): Promise<void> => {
   setPresentationMode(false);
   document.body.style.overflow = "";
