@@ -326,7 +326,7 @@ function App() {
               className="presentationMedia"
               src={currentItem.url}
               autoPlay
-              muted={true}
+              muted={!soundEnabled}
               playsInline
               preload="auto"
               controls={false}
@@ -355,7 +355,21 @@ function App() {
           <div className="presentationControls">
             <button
               type="button"
-              onClick={() => setSoundEnabled((enabled) => !enabled)}
+              onClick={() => {
+  const newValue = !soundEnabled;
+
+  setSoundEnabled(newValue);
+
+  if (videoRef.current) {
+    videoRef.current.muted = !newValue;
+
+    videoRef.current
+      .play()
+      .catch((error) =>
+        console.warn("Playback retry failed", error)
+      );
+  }
+}}
             >
               {soundEnabled ? "Mute" : "Enable Sound"}
             </button>
