@@ -346,7 +346,7 @@ setTimeout(() => {
   muted={!soundEnabled}
   playsInline
   preload="auto"
-  controls={false}
+  controls={true}
   onEnded={nextSlide}
             />
           )}
