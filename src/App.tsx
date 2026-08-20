@@ -248,15 +248,15 @@ console.log("PLAYING VIDEO", currentItem.name);
   video.muted = !soundEnabled;
 
 setTimeout(() => {
-  video.load();
+  video.currentTime = 0;
 
-  video.play().catch((error: unknown) => {
+  video.play().catch((error) => {
     console.warn(
       "Browser blocked automatic video playback.",
       error
     );
   });
-}, 300);
+}, 200);
 }, [
   currentIndex,
   currentItem,
@@ -342,15 +342,15 @@ setTimeout(() => {
               alt={currentItem.name}
             />
           ) : (
-           <video
-  key={currentItem.id}
+          <video
+  key={`${currentItem.id}-${currentIndex}`}
   ref={videoRef}
   className="presentationMedia"
-  src={currentItem.url}
   autoPlay
   muted={!soundEnabled}
   playsInline
   preload="auto"
+  
   controls={true}
   onEnded={nextSlide}
             />
