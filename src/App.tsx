@@ -237,7 +237,7 @@ function App() {
     const video = videoRef.current;
     if (!presentationMode || !video || currentItem?.type !== "video") return;
 
-    video.muted = !soundEnabled;
+    video.muted = true;
     void video.play().catch((error: unknown) => {
       console.warn("Browser blocked automatic video playback.", error);
     });
@@ -325,8 +325,10 @@ function App() {
               ref={videoRef}
               className="presentationMedia"
               src={currentItem.url}
-              muted={!soundEnabled}
+              autoPlay
+              muted={true}
               playsInline
+              preload="auto"
               controls={false}
               onEnded={nextSlide}
             />
