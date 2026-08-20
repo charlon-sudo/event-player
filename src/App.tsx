@@ -248,15 +248,13 @@ console.log("PLAYING VIDEO", currentItem.name);
   video.muted = !soundEnabled;
 
 setTimeout(() => {
-  video.currentTime = 0;
-
-  video.play().catch((error) => {
+  video.play().catch((error: unknown) => {
     console.warn(
       "Browser blocked automatic video playback.",
       error
     );
   });
-}, 200);
+}, 300);
 }, [
   currentIndex,
   currentItem,
@@ -343,7 +341,7 @@ setTimeout(() => {
             />
           ) : (
           <video
-  key={`${currentItem.id}-${currentIndex}`}
+  key={currentItem.id}
   ref={videoRef}
   className="presentationMedia"
   autoPlay
@@ -352,7 +350,10 @@ setTimeout(() => {
   preload="auto"
   
   controls={true}
-  onEnded={nextSlide}
+ onEnded={() => {
+  console.log("VIDEO ENDED", currentItem.name);
+  nextSlide();
+}}
             />
           )}
 
