@@ -1,118 +1,373 @@
 import "./App.css";
+import { useEffect, useRef, useState } from "react";
 import { useMsal } from "@azure/msal-react";
+
+type MediaType = "image" | "video";
+
+interface SharePointFile {
+  id: string;
+  name: string;
+  "@microsoft.graph.downloadUrl"?: string;
+}
+
+interface MediaItem {
+  id: string;
+  name: string;
+  url: string;
+  type: MediaType;
+}
+
+interface SiteResponse {
+  id?: string;
+  error?: { message?: string };
+}
+
+interface DriveResponse {
+  id?: string;
+  error?: { message?: string };
+}
+
+interface FolderResponse {
+  value?: SharePointFile[];
+  error?: { message?: string };
+}
+
+const GRAPH_BASE = "https:" + "//graph.microsoft.com/v1.0";
+const SCOPES = ["User.Read", "Files.Read.All", "Sites.Read.All"];
 
 function App() {
   const { instance, accounts } = useMsal();
 
-  const signIn = async () => {
-    await instance.loginRedirect({
-      scopes: ["User.Read"],
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [presentationMode, setPresentationMode] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+
+  const imageTimerRef = useRef<number | undefined>(undefined);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const currentItem = mediaItems[currentIndex];
+
+  const signIn = async (): Promise<void> => {
+    await instance.loginRedirect({ scopes: SCOPES });
+  };
+
+  const signOut = async (): Promise<void> => {
+    await instance.logoutRedirect();
+  };
+
+  const getMediaType = (fileName: string): MediaType | undefined => {
+    const extension = fileName.split(".").pop()?.toLowerCase();
+    const imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "bmp"];
+    const videoExtensions = ["mp4", "mov", "m4v", "webm", "ogg", "mkv"];
+
+    if (extension && imageExtensions.includes(extension)) return "image";
+    if (extension && videoExtensions.includes(extension)) return "video";
+    return undefined;
+  };
+
+  const nextSlide = (): void => {
+    setCurrentIndex((index) =>
+      mediaItems.length > 0 ? (index + 1) % mediaItems.length : 0
+    );
+  };
+
+  const previousSlide = (): void => {
+    setCurrentIndex((index) => {
+      if (mediaItems.length === 0) return 0;
+      return index === 0 ? mediaItems.length - 1 : index - 1;
     });
   };
 
-  const signOut = async () => {
-    await instance.logoutRedirect();
-  };
-  const loadMedia = async () => {
-  try {
-    const tokenResponse =
-      await instance.acquireTokenSilent({
-        scopes: [
-          "User.Read",
-          "Files.Read.All",
-          "Sites.Read.All",
-        ],
-        account: accounts[0],
+  const loadMedia = async (): Promise<void> => {
+    const account = accounts[0];
+    if (!account) {
+      setMessage("Please sign in first.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+    setMediaItems([]);
+    setCurrentIndex(0);
+
+    try {
+      const tokenResponse = await instance.acquireTokenSilent({
+        scopes: SCOPES,
+        account,
       });
 
-    const response = await fetch(
-      "https://graph.microsoft.com/v1.0/sites/grandhotelwarrandyte.sharepoint.com:/sites/GHW",
-      {
-        headers: {
-          Authorization: `Bearer ${tokenResponse.accessToken}`,
-        },
+      const headers = {
+        Authorization: `Bearer ${tokenResponse.accessToken}`,
+      };
+
+      const siteResponse = await fetch(
+        GRAPH_BASE +
+          "/sites/grandhotelwarrandyte.sharepoint.com:/sites/GHW",
+        { headers }
+      );
+
+      if (!siteResponse.ok) {
+        throw new Error(
+          `Site request failed: ${siteResponse.status} ${siteResponse.statusText}`
+        );
       }
-    );
 
-    const data = await response.json();
-console.log(data);
-    console.log("SITE DATA", data);
+      const siteData = (await siteResponse.json()) as SiteResponse;
+      if (!siteData.id) {
+        throw new Error(siteData.error?.message || "SharePoint site ID not returned.");
+      }
 
-const driveResponse = await fetch(
-  `https://graph.microsoft.com/v1.0/sites/${data.id}/drive`,
-  {
-    headers: {
-      Authorization: `Bearer ${tokenResponse.accessToken}`,
-    },
-  }
-);
+      const driveResponse = await fetch(
+        GRAPH_BASE + "/sites/" + encodeURIComponent(siteData.id) + "/drive",
+        { headers }
+      );
 
-const driveData = await driveResponse.json();
+      if (!driveResponse.ok) {
+        throw new Error(
+          `Drive request failed: ${driveResponse.status} ${driveResponse.statusText}`
+        );
+      }
 
-console.log("DRIVE DATA", driveData);
+      const driveData = (await driveResponse.json()) as DriveResponse;
+      if (!driveData.id) {
+        throw new Error(
+          driveData.error?.message || "Document library ID not returned."
+        );
+      }
 
-console.log("DRIVE DATA", driveData);
+      const folderPath =
+        "Functions/Functions AV Uploads/Caledonia Room/Event 1";
+      const encodedFolderPath = folderPath
+        .split("/")
+        .map((part) => encodeURIComponent(part))
+        .join("/");
 
-const folderResponse = await fetch(
-  `https://graph.microsoft.com/v1.0/drives/${driveData.id}/root:/Functions/Functions%20AV%20Uploads/Caledonia%20Room/Event%201:/children`,
-  {
-    headers: {
-      Authorization: `Bearer ${tokenResponse.accessToken}`,
-    },
-  }
-);
+      const folderResponse = await fetch(
+        GRAPH_BASE +
+          "/drives/" +
+          encodeURIComponent(driveData.id) +
+          "/root:/" +
+          encodedFolderPath +
+          ":/children",
+        { headers }
+      );
 
-const folderData = await folderResponse.json();
+      if (!folderResponse.ok) {
+        throw new Error(
+          `Folder request failed: ${folderResponse.status} ${folderResponse.statusText}`
+        );
+      }
 
-console.log("FOLDER DATA", folderData);
+      const folderData = (await folderResponse.json()) as FolderResponse;
 
-const fileNames = folderData.value
-  .map((file: any) => file.name)
-  .join("\n");
+      const items = (folderData.value || [])
+        .map((file): MediaItem | undefined => {
+          const type = getMediaType(file.name);
+          const url = file["@microsoft.graph.downloadUrl"];
+          if (!type || !url) return undefined;
+          return { id: file.id, name: file.name, url, type };
+        })
+        .filter((item): item is MediaItem => item !== undefined);
 
-alert(fileNames);
+      setMediaItems(items);
+      setMessage(
+        items.length > 0
+          ? `Loaded ${items.length} media file(s) from Event 1.`
+          : "No supported images or videos were found in Event 1."
+      );
+    } catch (error) {
+      console.error(error);
+      setMessage(
+        error instanceof Error ? error.message : "Unable to load SharePoint media."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startPresentation = (): void => {
+    if (mediaItems.length === 0) return;
+    setSoundEnabled(true);
+    setPresentationMode(true);
+    document.body.style.overflow = "hidden";
+  };
+
+  const exitPresentation = async (): Promise<void> => {
+  setPresentationMode(false);
+  document.body.style.overflow = "";
+
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    }
   } catch (error) {
-    console.error(error);
-    alert("Failed");
+    console.warn("Exit fullscreen failed", error);
   }
 };
 
+  useEffect(() => {
+    if (imageTimerRef.current !== undefined) {
+      window.clearTimeout(imageTimerRef.current);
+    }
+
+    if (
+      !presentationMode ||
+      !currentItem ||
+      currentItem.type !== "image" ||
+      mediaItems.length <= 1
+    ) {
+      return;
+    }
+
+    imageTimerRef.current = window.setTimeout(() => {
+      setCurrentIndex((index) => (index + 1) % mediaItems.length);
+    }, 10000);
+
+    return () => {
+      if (imageTimerRef.current !== undefined) {
+        window.clearTimeout(imageTimerRef.current);
+      }
+    };
+  }, [currentIndex, currentItem, mediaItems.length, presentationMode]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!presentationMode || !video || currentItem?.type !== "video") return;
+
+    video.muted = !soundEnabled;
+    void video.play().catch((error: unknown) => {
+      console.warn("Browser blocked automatic video playback.", error);
+    });
+  }, [currentIndex, currentItem, presentationMode, soundEnabled]);
+
   return (
-    <div className="app">
-      <div className="container">
-        <h1>Event Player</h1>
+    <div className={presentationMode ? "app presentationApp" : "app"}>
+      {!presentationMode && (
+        <div className="container">
+          <h1>Event Player</h1>
 
-        {accounts.length > 0 ? (
-          <>
-            <h2>Welcome</h2>
+          {accounts.length > 0 ? (
+            <>
+              <h2>Welcome</h2>
+              <p>{accounts[0].username}</p>
 
-            <p>{accounts[0].username}</p>
+              <div className="buttonRow">
+                <button
+                  className="primaryButton"
+                  type="button"
+                  onClick={() => void loadMedia()}
+                  disabled={loading}
+                >
+                  {loading ? "Loading Media..." : "Load SharePoint Media"}
+                </button>
 
-           <div className="buttonRow">
-  <button
-  className="signInButton"
-  onClick={loadMedia}
->
-  Load SharePoint Media
-</button>
+                <button
+                  className="secondaryButton"
+                  type="button"
+                  onClick={() => void signOut()}
+                >
+                  Sign Out
+                </button>
+              </div>
 
-  <button
-    className="secondaryButton"
-    onClick={signOut}
-  >
-    Sign Out
-  </button>
-</div>
-          </>
-        ) : (
+              {message && <p className="statusMessage">{message}</p>}
+
+              {mediaItems.length > 0 && (
+                <>
+                  <button
+                    className="startButton"
+                    type="button"
+                    onClick={startPresentation}
+                  >
+                    Start Presentation
+                  </button>
+
+                  <div className="mediaGrid">
+                    {mediaItems.map((item) => (
+                      <div className="mediaCard" key={item.id}>
+                        {item.type === "image" ? (
+                          <img src={item.url} alt={item.name} />
+                        ) : (
+                          <video src={item.url} muted playsInline preload="metadata" />
+                        )}
+                        <p>{item.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <button
+              className="primaryButton"
+              type="button"
+              onClick={() => void signIn()}
+            >
+              Sign in with Microsoft
+            </button>
+          )}
+        </div>
+      )}
+
+      {presentationMode && currentItem && (
+        <div className="presentationStage">
+          {currentItem.type === "image" ? (
+            <img
+              className="presentationMedia"
+              src={currentItem.url}
+              alt={currentItem.name}
+            />
+          ) : (
+            <video
+              ref={videoRef}
+              className="presentationMedia"
+              src={currentItem.url}
+              muted={!soundEnabled}
+              playsInline
+              controls={false}
+              onEnded={nextSlide}
+            />
+          )}
+
           <button
-            className="signInButton"
-            onClick={signIn}
+            className="previousButton"
+            type="button"
+            onClick={previousSlide}
+            aria-label="Previous media"
           >
-            Sign in with Microsoft
+            ‹
           </button>
-        )}
-      </div>
+
+          <button
+            className="nextButton"
+            type="button"
+            onClick={nextSlide}
+            aria-label="Next media"
+          >
+            ›
+          </button>
+
+          <div className="presentationControls">
+            <button
+              type="button"
+              onClick={() => setSoundEnabled((enabled) => !enabled)}
+            >
+              {soundEnabled ? "Mute" : "Enable Sound"}
+            </button>
+
+            <span>
+              {currentIndex + 1} / {mediaItems.length}
+            </span>
+
+            <button type="button" onClick={exitPresentation}>
+              Exit
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
