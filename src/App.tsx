@@ -237,7 +237,7 @@ function App() {
     const video = videoRef.current;
     if (!presentationMode || !video || currentItem?.type !== "video") return;
 
-    video.muted = true;
+    video.muted = !soundEnabled;
     void video.play().catch((error: unknown) => {
       console.warn("Browser blocked automatic video playback.", error);
     });
